@@ -36,6 +36,32 @@ public class GameService {
         GameResponseDTO response = new GameResponseDTO();
         // TODO: Implementar el método startGame
         // Validar que el jugador existe
+        Player jugador = playerRepository.findById(playerId).orElse(null);
+
+        if (jugador != null) {
+            GameInProgress juego = gameInProgressRepository.findByJugadorIdOrderByFechaInicioDesc(playerId).get(0);
+            Optional<Word> palabra = wordRepository.findByPalabra(juego.getPalabra().getPalabra());
+
+            if (juego !=null && palabra.isPresent()) {
+                response = buildResponseFromGameInProgress(juego);
+
+            }
+            else {
+                palabra = wordRepository.findRandomWord();
+                response.setPalabraCompleta(false);
+                response.setIntentosRestantes(MAX_INTENTOS);
+                response.setLetrasIntentadas(Collections.emptyList());
+                String pal = palabra.get().getPalabra();
+
+                char[] palabraOculta = new char[pal.length()];
+                for (int i = 0; i < pal.length(); i++) {
+                    palabraOculta[i] = '_';
+                }
+
+                response.setPalabraOculta(palabraOculta.toString());
+                response.setPuntajeAcumulado(0);
+            }
+        }
        
         // Verificar si ya existe una partida en curso para este jugador y palabra
         
@@ -51,6 +77,48 @@ public class GameService {
         GameResponseDTO response = new GameResponseDTO();
         // TODO: Implementar el método makeGuess
         // Validar que el jugador existe
+        Player jugador = playerRepository.findById(playerId).orElse(null);
+
+        if (jugador != null) {
+            GameInProgress juego = gameInProgressRepository.findByJugadorIdOrderByFechaInicioDesc(playerId).get(0);
+            Optional<Word> palabra = wordRepository.findByPalabra(juego.getPalabra().getPalabra());
+            String mayusculas = palabra.toString().toUpperCase();
+            String intentadas = juego.getLetrasIntentadas();
+            char[] letrasIntentadas = new char[intentadas.length()];
+
+            for (int i=0; i<letrasIntentadas.length; i++) {
+                if (intentadas.charAt(i) != ',' && intentadas.charAt(i) != ' ' && intentadas.charAt(i)== letra) {
+                    letrasIntentadas[i] = letra;
+                }
+            }
+
+            intentadas = letrasIntentadas.toString();
+
+            for (int i=0; i<mayusculas.length(); i++) {
+                    if (mayusculas.charAt(i) != letra) {
+                        if (response.getIntentosRestantes() > 0) {
+                            response.setIntentosRestantes(response.getIntentosRestantes() - 1);
+                        }
+                        }
+
+                    }
+
+
+            char[] palabraOculta = new char[mayusculas.length()];
+            for (int i = 0; i < mayusculas.length(); i++) {
+                palabraOculta[i] = '_';
+            }
+
+            response.setPalabraOculta(palabraOculta.toString());
+
+            if (response.getIntentosRestantes() == 0) {
+                saveGame(jugador, palabra.get(), true, response.getPuntajeAcumulado());
+                gameInProgressRepository.delete(juego);
+            }
+
+
+
+        }
 
         // Convertir la letra a mayúscula
         
@@ -145,7 +213,7 @@ public class GameService {
     }
     
     @Transactional
-    private void saveGame(Player player, Word word, boolean ganado, int puntaje) {
+    protected void saveGame(Player player, Word word, boolean ganado, int puntaje) {
         // Asegurar que la palabra esté marcada como utilizada
         if (!word.getUtilizada()) {
             word.setUtilizada(true);
